@@ -1,9 +1,9 @@
 import hashlib
+import time
+import logging
 from pathlib import Path
 
-from playwright.sync_api import (
-    sync_playwright,
-    TimeoutError as PlaywrightTimeoutError,
+from playwright.sync_api import (sync_playwright,TimeoutError as PlaywrightTimeoutError,
 )
 from sqlalchemy import text
 
@@ -16,32 +16,56 @@ SNAPSHOT_FILE = "data/hitechpros_snapshot.html"
 
 MISSIONS_URL = "https://esn.hitechpros.com/missions"
 
+logger = logging.getLogger("hitechpros")
+
 
 def create_hash(value: str) -> str:
     return hashlib.sha256(
         value.encode("utf-8")
     ).hexdigest()
 
+def session_is_expired(page) -> bool:
+    current_url = page.url.lower()
+    if "login" in current_url or "connexion" in current_url:
+        return True
+
+    try:
+        password_field = page.locator(
+            "input[type='password']"
+        )
+
+        if (
+            password_field.count() > 0
+            and password_field.first.is_visible()
+        ):
+            return True
+
+    except Exception:
+        pass
+
+    return False
 
 def fetch_hitechpros_snapshot(
     headless: bool = True
 ) -> bool:
 
-    print("Opening HiTechPros...")
+    logger.info("Opening HiTechPros")
 
     with sync_playwright() as p:
 
-        browser = p.chromium.launch(
-            headless=headless
-        )
-
-        context = browser.new_context(
-            storage_state=AUTH_FILE
-        )
-
-        page = context.new_page()
+        browser = None
 
         try:
+            browser = p.chromium.launch(
+                headless=headless
+            )
+
+            context = browser.new_context(
+                storage_state=AUTH_FILE
+            )
+
+            page = context.new_page()
+
             page.goto(
                 MISSIONS_URL,
                 wait_until="domcontentloaded",
@@ -49,12 +73,13 @@ def fetch_hitechpros_snapshot(
             )
 
             try:
+                
                 page.wait_for_load_state(
                     "networkidle",
                     timeout=15000,
                 )
             except PlaywrightTimeoutError:
-                print(
+                logger.warning(
                     "Network did not become idle, "
                     "continuing anyway..."
                 )
@@ -64,22 +89,11 @@ def fetch_hitechpros_snapshot(
 
             current_url = page.url
 
-            print(
-                f"Current URL: {current_url}"
-            )
+            logger.info("Current URL: %s", current_url)
 
             # Authentication check
-            if (
-                "login" in current_url.lower()
-                or "connexion" in current_url.lower()
-            ):
-                print(
-                    "HiTechPros authentication "
-                    "session appears to be expired."
-                )
-
-                browser.close()
-
+            if session_is_expired(page):
+                logger.warning("HiTechPros session expired")
                 return False
 
             html = page.content()
@@ -91,36 +105,29 @@ def fetch_hitechpros_snapshot(
                 encoding="utf-8",
             )
 
-            print(
-                f"Snapshot saved: "
-                f"{SNAPSHOT_FILE}"
-            )
+            logger.info("Snapshot saved: %s", SNAPSHOT_FILE)
 
-            browser.close()
+            #browser.close()
 
             return True
 
         except Exception as error:
 
-            print(
-                f"HiTechPros collection error: "
-                f"{error}"
+            logger.exception( "HiTechPros snapshot ""collection failed"
             )
 
-            browser.close()
+            #browser.close()
 
             return False
+        
+        finally:
+            if browser is not None:
+                browser.close()
 
 
-def insert_hitechpros_missions() -> int:
-
-    missions = parse_hitechpros_snapshot(
-        SNAPSHOT_FILE
-    )
-
-    print(
-        f"Missions parsed: {len(missions)}"
-    )
+def insert_hitechpros_missions(
+    missions: list[dict]
+) -> int:
 
     inserted_count = 0
 
@@ -182,34 +189,74 @@ def insert_hitechpros_missions() -> int:
 
     return inserted_count
 
-
-def collect_hitechpros(
-    headless: bool = True
-) -> int:
+def collect_hitechpros(headless: bool = True) -> dict:
+    start_time = time.perf_counter()
 
     success = fetch_hitechpros_snapshot(
         headless=headless
     )
 
     if not success:
-        print(
-            "HiTechPros collection aborted."
+        return {
+            "status": "failed",
+            "parsed": 0,
+            "inserted": 0,
+            "duplicates": 0,
+            "errors": 1,
+            "execution_time": round(
+                time.perf_counter() - start_time,
+                2
+            ),
+        }
+
+    missions = parse_hitechpros_snapshot(
+        SNAPSHOT_FILE
+    )
+    parsed_count = len(missions)
+    if parsed_count == 0:
+        logger.error(
+            "No missions were parsed from "
+            "HiTechPros snapshot"
         )
 
-        return 0
+        return {
+            "status": "failed",
+            "parsed": 0,
+            "inserted": 0,
+            "duplicates": 0,
+            "errors": 1,
+            "execution_time": round(
+                time.perf_counter()
+                - start_time,
+                2
+            ),
+        }
 
-    count = insert_hitechpros_missions()
-
-    print(
-        f"New HiTechPros missions "
-        f"inserted: {count}"
+    logger.info(
+        "Missions parsed: %s",
+        parsed_count
     )
 
-    return count
+    inserted_count = insert_hitechpros_missions(missions)
+
+    duplicates_count = (
+        parsed_count - inserted_count
+    )
+
+    return {
+        "status": "success",
+        "parsed": parsed_count,
+        "inserted": inserted_count,
+        "duplicates": duplicates_count,
+        "errors": 0,
+        "execution_time": round(
+            time.perf_counter() - start_time,
+            2
+        ),
+    }
 
 
 if __name__ == "__main__":
-
-    collect_hitechpros(
+    result = collect_hitechpros(
         headless=False
     )

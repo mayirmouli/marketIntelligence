@@ -1,5 +1,6 @@
 import json
 import re
+import time
 from sqlalchemy import text
 from app.storage.db import engine
 from app.enrichment.rules import (
@@ -82,7 +83,10 @@ def calculate_market_attractiveness_score(
     return min(score, 100)
 
 
-def enrich_new_clean_opportunities() -> int:
+def enrich_new_clean_opportunities() -> dict:
+
+    start_time = time.perf_counter()
+
     with engine.begin() as connection:
         clean_rows = connection.execute(
             text("""
@@ -94,6 +98,7 @@ def enrich_new_clean_opportunities() -> int:
             """)
         ).mappings().all()
 
+        processed_count = len(clean_rows)
         inserted_count = 0
 
         for row in clean_rows:
@@ -209,4 +214,13 @@ def enrich_new_clean_opportunities() -> int:
 
             inserted_count += 1
 
-    return inserted_count
+    return {
+        "status": "success",
+        "processed": processed_count,
+        "inserted": inserted_count,
+        "errors": 0,
+        "execution_time": round(
+            time.perf_counter() - start_time,
+            2
+        ),
+    }

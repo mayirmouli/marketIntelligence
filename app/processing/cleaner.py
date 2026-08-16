@@ -1,4 +1,5 @@
 import re
+import time
 from sqlalchemy import text
 from app.storage.db import engine
 
@@ -29,7 +30,9 @@ def detect_language(text_value: str) -> str:
     return "unknown"
 
 
-def clean_new_raw_opportunities() -> int:
+def clean_new_raw_opportunities() -> dict:
+    start_time = time.perf_counter()
+
     with engine.begin() as connection:
         raw_rows = connection.execute(
             text("""
@@ -41,6 +44,7 @@ def clean_new_raw_opportunities() -> int:
             """)
         ).mappings().all()
 
+        processed_count = len(raw_rows)
         inserted_count = 0
 
         for row in raw_rows:
@@ -65,4 +69,13 @@ def clean_new_raw_opportunities() -> int:
 
             inserted_count += 1
 
-    return inserted_count
+    return {
+        "status": "success",
+        "processed": processed_count,
+        "inserted": inserted_count,
+        "errors": 0,
+        "execution_time": round(
+            time.perf_counter() - start_time,
+            2
+        ),
+    }
