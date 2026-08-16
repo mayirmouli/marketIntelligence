@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+
+.env
+
+data/hitechpros_auth.json
+data/hitechpros_snapshot.html
+
+.vscode/
+.idea/
+
+.DS_Store
+Thumbs.db
+
+data/*.html

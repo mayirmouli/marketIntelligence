@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: market_intel_postgres
+    environment:
+      POSTGRES_DB: market_intel
+      POSTGRES_USER: market_user
+      POSTGRES_PASSWORD: market_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+volumes:
+  postgres_data:
