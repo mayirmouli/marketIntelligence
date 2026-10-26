@@ -1,16 +1,26 @@
+# Virtual environment
 .venv/
+
+# Python
 __pycache__/
 *.pyc
 
+# Environment
 .env
 
-data/hitechpros_auth.json
-data/hitechpros_snapshot.html
+# Authentication
+data/*.json
 
+# Generated snapshots
+data/*.html
+
+# Logs
+logs/
+
+# IDE
 .vscode/
 .idea/
 
+# OS
 .DS_Store
 Thumbs.db
-
-data/*.html

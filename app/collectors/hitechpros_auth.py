@@ -1,3 +1,4 @@
+
 from playwright.sync_api import sync_playwright
 
 AUTH_FILE = "data/hitechpros_auth.json"
@@ -9,7 +10,7 @@ def save_hitechpros_session():
         context = browser.new_context()
         page = context.new_page()
 
-        page.goto("https://esn.hitechpros.com", wait_until="domcontentloaded")
+        page.goto("https://esn.hitechpros.com/missions", wait_until="domcontentloaded")
 
         print("Log in manually in the opened browser.")
         print("Go to the page where you can see missions/offers.")

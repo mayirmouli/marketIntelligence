@@ -1,16 +1,112 @@
 services:
+
   postgres:
     image: postgres:16
     container_name: market_intel_postgres
+
     environment:
       POSTGRES_DB: market_intel
       POSTGRES_USER: market_user
       POSTGRES_PASSWORD: market_password
+
     ports:
       - "5432:5432"
+
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
 
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U market_user -d market_intel"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: market_intel_pipeline
+
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: market_intel
+      POSTGRES_USER: market_user
+      POSTGRES_PASSWORD: market_password
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+
+    command:
+      python -m app.main
+
+
+  pipeline_api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: market_intel_pipeline_api
+
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: market_intel
+      POSTGRES_USER: market_user
+      POSTGRES_PASSWORD: market_password
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+
+    ports:
+      - "8000:8000"
+
+    command:
+      uvicorn app.runner_api:app --host 0.0.0.0 --port 8000
+
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: market_intel_n8n
+
+    ports:
+      - "5678:5678"
+
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - GENERIC_TIMEZONE=Africa/Algiers
+      - TZ=Africa/Algiers
+
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+
 volumes:
+
   postgres_data:
+
+  n8n_data:
+    external: true

@@ -258,5 +258,5 @@ def collect_hitechpros(headless: bool = True) -> dict:
 
 if __name__ == "__main__":
     result = collect_hitechpros(
-        headless=False
+        headless=True
     )
