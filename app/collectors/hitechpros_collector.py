@@ -2,6 +2,7 @@ import hashlib
 import time
 import logging
 from pathlib import Path
+from datetime import datetime
 
 from playwright.sync_api import (sync_playwright,TimeoutError as PlaywrightTimeoutError,
 )
@@ -18,6 +19,24 @@ MISSIONS_URL = "https://esn.hitechpros.com/missions"
 
 logger = logging.getLogger("hitechpros")
 
+
+def parse_published_at(value: str | None):
+    if not value:
+        return None
+
+    value = value.strip()
+
+    for fmt in (
+        "%d/%m/%Y",
+        "%d/%m/%y",
+        "%d-%m-%Y",
+    ):
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+
+    return None
 
 def create_hash(value: str) -> str:
     return hashlib.sha256(
@@ -69,7 +88,7 @@ def fetch_hitechpros_snapshot(
             page.goto(
                 MISSIONS_URL,
                 wait_until="domcontentloaded",
-                timeout=30000,
+                timeout=90000,
             )
 
             try:
@@ -111,10 +130,9 @@ def fetch_hitechpros_snapshot(
 
             return True
 
-        except Exception as error:
+        except Exception:
 
-            logger.exception( "HiTechPros snapshot ""collection failed"
-            )
+            logger.exception("HiTechPros snapshot ""collection failed")
 
             #browser.close()
 
@@ -151,6 +169,10 @@ def insert_hitechpros_missions(
                         title,
                         raw_text,
                         url,
+                        company_name,
+                        location,
+                        remote_policy,
+                        published_at,
                         content_hash
                     )
                     VALUES
@@ -160,6 +182,10 @@ def insert_hitechpros_missions(
                         :title,
                         :raw_text,
                         :url,
+                        :company_name,
+                        :location,
+                        :remote_policy,
+                        :published_at,
                         :content_hash
                     )
                     ON CONFLICT (content_hash)
@@ -167,21 +193,17 @@ def insert_hitechpros_missions(
                 """),
                 {
                     "source_name": "HiTechPros",
-
-                    "external_id":
-                        mission["external_id"],
-
-                    "title":
-                        mission["title"],
-
-                    "raw_text":
-                        mission["raw_text"],
-
-                    "url":
-                        mission["url"],
-
-                    "content_hash":
-                        content_hash,
+                    "external_id": mission["external_id"],
+                    "title": mission["title"],
+                    "raw_text": mission["raw_text"],
+                    "url": mission["url"],
+                    "company_name": mission.get("company"),
+                    "location": mission.get("location"),
+                    "remote_policy": mission.get("remote_policy"),
+                    "published_at": parse_published_at(
+                        mission.get("published_at_raw")
+                    ),
+                    "content_hash": content_hash,
                 },
             )
 

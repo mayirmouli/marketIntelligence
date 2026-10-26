@@ -56,7 +56,7 @@ def run_pipeline():
             collector_result["duplicates"],
         )
 
-        cleaner_result = (clean_new_raw_opportunities())
+        cleaner_result = clean_new_raw_opportunities()
         print_stage_result("Cleaning",cleaner_result)
         log_stage_result(
             run_id=run_id,
@@ -69,7 +69,7 @@ def run_pipeline():
             cleaner_result["inserted"],
         )
 
-        enricher_result = (enrich_new_clean_opportunities())
+        enricher_result = enrich_new_clean_opportunities()
         print_stage_result("Enrichment", enricher_result)
         log_stage_result(
             run_id=run_id,

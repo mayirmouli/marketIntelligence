@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 import re
 
 
-SNAPSHOT_FILE = "data/hitechpros_snapshot2.html"
+SNAPSHOT_FILE = "data/hitechpros_snapshot.html"
 
 def is_start_or_date(value: str) -> bool:
     if value.upper() == "ASAP":

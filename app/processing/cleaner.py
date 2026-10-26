@@ -36,7 +36,7 @@ def clean_new_raw_opportunities() -> dict:
     with engine.begin() as connection:
         raw_rows = connection.execute(
             text("""
-                SELECT ro.id, ro.title, ro.raw_text
+                SELECT ro.id, ro.title, ro.raw_text, ro.company_name, ro.location, ro.remote_policy
                 FROM raw_opportunities ro
                 LEFT JOIN clean_opportunities co
                     ON co.raw_opportunity_id = ro.id
@@ -51,19 +51,43 @@ def clean_new_raw_opportunities() -> dict:
             clean_title = normalize_text(row["title"])
             clean_description = normalize_text(row["raw_text"])
             language = detect_language(clean_description)
-
             connection.execute(
                 text("""
                     INSERT INTO clean_opportunities
-                    (raw_opportunity_id, title, description, language)
+                    (
+                        raw_opportunity_id,
+                        title,
+                        description,
+                        company_name,
+                        location,
+                        remote_policy,
+                        language
+                    )
                     VALUES
-                    (:raw_opportunity_id, :title, :description, :language)
+                    (
+                        :raw_opportunity_id,
+                        :title,
+                        :description,
+                        :company_name,
+                        :location,
+                        :remote_policy,
+                        :language
+                    )
                 """),
                 {
                     "raw_opportunity_id": row["id"],
                     "title": clean_title,
                     "description": clean_description,
-                    "language": language
+                    "company_name": normalize_text(
+                        row["company_name"]
+                    ),
+                    "location": normalize_text(
+                        row["location"]
+                    ),
+                    "remote_policy": normalize_text(
+                        row["remote_policy"]
+                    ),
+                    "language": language,
                 }
             )
 
